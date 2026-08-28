@@ -1,0 +1,81 @@
+# ---------------------------------------------------------------------------
+# nullbedingung — die eine Frage, für die dieser Fork existiert.
+#
+#   spec.md §34: "Baut und testet das Projekt in der CI grün, OHNE fremde
+#   Zugangsdaten und OHNE private Registry-Zugänge?"
+#
+# Deshalb hat dieser Job KEINE `secrets:` und KEINE Anmeldung an irgendetwas.
+# Wer hier Zugangsdaten einbaut, um grün zu werden, hat die Frage nicht
+# beantwortet, sondern umgangen (Issue #18, Falle 2).
+#
+# ROT IST KEIN SCHEITERN. spec.md §34: die Schritte A–E und G–L hängen nicht an
+# der Nullbedingung; nur der Migrations-Agent (Nice-to-have Rang 6) tut es. Ein
+# ehrliches "rot, weil X" ist mehr wert als ein grün, das mit einer
+# Sonderbehandlung erkauft wurde.
+#
+# JDK-VERSION IST FESTGENAGELT, nicht geerbt.
+#
+#   Am Tag 1.9.0 (08.07.2024) deklariert das pom.xml <java.version>22</java.version>
+#   bei Spring Boot 3.3.1. Auf dem heutigen Upstream-`main` steht dort 26 — wer
+#   von `main` abliest, nagelt den falschen Wert fest (ADR 0009, Risiko 1).
+#
+#   Die Nullbedingung wird nur mit festgenageltem JDK geprüft. Ein grüner Lauf
+#   auf dem, was auf dem Runner zufällig liegt, belegt nichts.
+#
+# JOB- UND ARTEFAKTNAME SIND SCHNITTSTELLE.
+#
+#   `bauen-und-testen` und `surefire-xml` — dieselben Namen wie im Hauptrepo.
+#   `holePrüfergebnisse(ref)` (spec.md §6) und `tools/fixtures-ernten.sh`
+#   erkennen beides AM NAMEN. Umbenennen bricht die Aufrufer, ohne dass hier
+#   etwas rot wird.
+# ---------------------------------------------------------------------------
+name: build
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [mvp-basis]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bauen-und-testen:
+    name: bauen-und-testen
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Quellen holen
+        uses: actions/checkout@v4
+
+      - name: JDK 22 einrichten
+        uses: actions/setup-java@v5
+        with:
+          # Festgenagelt auf den Stand am Tag 1.9.0, nicht auf den von main.
+          java-version: '22'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Werkzeugstaende zitieren
+        # spec.md §32: ausführen und die Ausgabe zitieren.
+        run: |
+          mvn -v
+          java -version
+          echo "pom.xml sagt: $(grep -oE '<java.version>[^<]*' pom.xml)"
+
+      - name: Bauen und testen
+        # Kein -DskipTests, keine Profile, keine Zugangsdaten. Genau das ist der Punkt.
+        run: mvn -B verify
+
+      - name: Surefire-XML als Artefakt ablegen
+        # if: always() — genau der ROTE Lauf ist der, den das Tor aus spec.md §24
+        # später vergleicht. Ohne ihn hat es keine Eingabe.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-xml
+          path: '**/target/surefire-reports/*.xml'
+          if-no-files-found: warn
+          retention-days: 30
