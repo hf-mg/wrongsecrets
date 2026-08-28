@@ -110,3 +110,78 @@ jobs:
           path: '**/target/surefire-reports/*.xml'
           if-no-files-found: error
           retention-days: 30
+
+      # -----------------------------------------------------------------------
+      # SBOM: DIE DATEI ZUERST. (spec.md §8.2, Prüfung 25)
+      #
+      #   "Die SBOM-Datei wird ZUERST in eine dauerhafte Ablage geschrieben und
+      #    DANACH nach Dependency-Track geladen. Widersprechen sich die beiden,
+      #    gewinnt die Datei."
+      #
+      # Die Reihenfolge ist hier nicht Konvention, sondern Bauform: der Upload
+      # (#34) läuft in einem eigenen Job, der `needs: bauen-und-testen` trägt und
+      # das Artefakt `sbom` herunterlädt. Er kann gar nicht vor der Ablage
+      # laufen, weil es vorher nichts zum Herunterladen gibt.
+      #
+      # Die Datei ist das Archiv. Dependency-Track ist die Abfrageschicht darüber
+      # und ersetzbar (§8.2).
+      # -----------------------------------------------------------------------
+      - name: SBOM in die Ablage schreiben
+        # if: always() — auch aus einem roten Lauf ist die Stückliste Nachweis.
+        if: always()
+        run: |
+          set -u
+          mkdir -p sbom-ablage
+          KURZ="${GITHUB_SHA:0:12}"
+
+          # EIN Dokument je Lauf, benannt nach Commit (spec.md §8.1: mehrere BOMs
+          # je Projektversion sind ausdrücklich nicht der Weg).
+          GEFUNDEN=0
+          for f in target/bom.json target/bom.xml; do
+            [ -f "$f" ] || continue
+            ENDUNG="${f##*.}"
+            cp "$f" "sbom-ablage/wrongsecrets-${KURZ}.cdx.${ENDUNG}"
+            GEFUNDEN=$((GEFUNDEN + 1))
+          done
+
+          if [ "$GEFUNDEN" -eq 0 ]; then
+            # WARNEN, NICHT SCHEITERN (spec.md §8.3): im Piloten wird nichts
+            # ausgeliefert, also blockiert eine fehlende SBOM den Lauf nicht.
+            # Sichtbar muss sie trotzdem sein - deshalb eine echte Annotation
+            # und keine Logzeile, die im Rauschen untergeht.
+            echo "::warning title=SBOM fehlt::Der CycloneDX-Schritt hat kein Dokument erzeugt. Im Piloten wird nichts ausgeliefert (spec.md 8.3), deshalb warnt dieser Schritt und bricht nicht ab. Der Upload-Job (#34) MUSS daran scheitern."
+            echo "SBOM_VORHANDEN=nein" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          echo "SBOM_VORHANDEN=ja" >> "$GITHUB_ENV"
+          echo "In der Ablage, vor jedem Upload:"
+          ls -l sbom-ablage/ | sed 's/^/  /'
+          echo
+          echo "Erste 400 Zeichen des Dokuments:"
+          head -c 400 "sbom-ablage/wrongsecrets-${KURZ}.cdx.json" 2>/dev/null | sed 's/^/  /'
+
+      - name: V8 messen — scope und transitive Komponenten
+        if: always() && env.SBOM_VORHANDEN == 'ja'
+        run: |
+          set -u
+          KURZ="${GITHUB_SHA:0:12}"
+          F="sbom-ablage/wrongsecrets-${KURZ}.cdx.json"
+          echo "=== V8: spec.md §35 — Scope und transitive Komponenten? ==="
+          echo "specVersion : $(grep -oE '\"specVersion\"[ ]*:[ ]*\"[^\"]+\"' "$F" | head -1)"
+          echo "Komponenten : $(grep -o '\"purl\"' "$F" | wc -l)"
+          echo "mit scope   : $(grep -o '\"scope\"' "$F" | wc -l)"
+          echo "scope-Werte : $(grep -oE '\"scope\"[ ]*:[ ]*\"[^\"]+\"' "$F" | sort | uniq -c | tr '\n' ' ')"
+          echo "dependencies-Block vorhanden: $(grep -c '\"dependencies\"' "$F")"
+          echo
+          echo "=== Erste drei Komponenten, vollstaendig ==="
+          tr ',' '\n' < "$F" | grep -E '\"(group|name|version|purl|scope)\"' | head -18 | sed 's/^/  /'
+
+      - name: SBOM als Artefakt ablegen
+        if: always() && env.SBOM_VORHANDEN == 'ja'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom-ablage/
+          if-no-files-found: error
+          retention-days: 90

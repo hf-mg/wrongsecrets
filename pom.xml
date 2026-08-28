@@ -432,7 +432,17 @@
             <goals>
               <goal>makeAggregateBom</goal>
             </goals>
-            <phase>install</phase>
+            <!--
+              GEAENDERT gegenueber Upstream: install -> package.
+
+              Unser Bau-Job faehrt "mvn verify", und verify liegt VOR install.
+              Mit der Upstream-Bindung entsteht die SBOM in unserem Lauf nie -
+              lautlos, denn ein nicht ausgefuehrtes Plugin meldet nichts.
+
+              spec.md 8.1 verlangt die SBOM "im selben Lauf und aus denselben
+              Quellen wie das Artefakt". package ist genau diese Stelle.
+            -->
+            <phase>package</phase>
           </execution>
         </executions>
       </plugin>
