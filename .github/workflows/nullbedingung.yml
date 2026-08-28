@@ -134,13 +134,31 @@ jobs:
           mkdir -p sbom-ablage
           KURZ="${GITHUB_SHA:0:12}"
 
+          # FALLE, erlitten in Lauf 33148396220: das Dokument liegt NICHT unter
+          # target/bom.json, obwohl das pom.xml <outputName>bom</outputName>
+          # sagt. Es landet unter
+          #     target/classes/META-INF/sbom/application.cdx.json
+          # weil spring-boot-starter-parent 3.3.1 eigene Vorgaben für das
+          # cyclonedx-Plugin mitbringt und diese sich durchsetzen.
+          #
+          # Deshalb wird gesucht statt geraten. Ein fester Pfad hätte hier still
+          # "keine SBOM" gemeldet, obwohl 373 Komponenten erzeugt worden waren -
+          # genau die Sorte Fehler, die wie ein Ergebnis aussieht.
+          echo "Gefundene BOM-Dateien im Baum:"
+          find target -type f \( -name '*.cdx.json' -o -name '*.cdx.xml' \
+                                 -o -name 'bom.json' -o -name 'bom.xml' \) \
+               -not -path '*/sbom-ablage/*' | sed 's/^/  /'
+
           # EIN Dokument je Lauf, benannt nach Commit (spec.md §8.1: mehrere BOMs
-          # je Projektversion sind ausdrücklich nicht der Weg).
+          # je Projektversion sind ausdrücklich nicht der Weg). Bei mehreren
+          # Treffern derselben Endung gewinnt der erste - und die Liste oben
+          # zeigt, ob es überhaupt mehrere gab.
           GEFUNDEN=0
-          for f in target/bom.json target/bom.xml; do
-            [ -f "$f" ] || continue
-            ENDUNG="${f##*.}"
-            cp "$f" "sbom-ablage/wrongsecrets-${KURZ}.cdx.${ENDUNG}"
+          for ENDUNG in json xml; do
+            QUELLE=$(find target -type f \( -name "*.cdx.$ENDUNG" -o -name "bom.$ENDUNG" \) \
+                     | head -1)
+            [ -n "$QUELLE" ] || continue
+            cp "$QUELLE" "sbom-ablage/wrongsecrets-${KURZ}.cdx.${ENDUNG}"
             GEFUNDEN=$((GEFUNDEN + 1))
           done
 
