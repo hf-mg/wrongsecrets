@@ -1,33 +1,42 @@
 # ---------------------------------------------------------------------------
-# nullbedingung — die eine Frage, für die dieser Fork existiert.
+# Zwei Jobs, weil zwei verschiedene Fragen zu beantworten sind.
 #
-#   spec.md §34: "Baut und testet das Projekt in der CI grün, OHNE fremde
-#   Zugangsdaten und OHNE private Registry-Zugänge?"
+#   nullbedingung      spec.md §34 — läuft `mvn verify` unverändert grün, OHNE
+#                      fremde Zugangsdaten? Darf rot sein. Rot IST ein Ergebnis.
 #
-# Deshalb hat dieser Job KEINE `secrets:` und KEINE Anmeldung an irgendetwas.
-# Wer hier Zugangsdaten einbaut, um grün zu werden, hat die Frage nicht
-# beantwortet, sondern umgangen (Issue #18, Falle 2).
+#   bauen-und-testen   der Job, den die Pipeline benutzt: übersetzt und testet
+#                      das Projekt und legt Surefire-XML ab.
 #
-# ROT IST KEIN SCHEITERN. spec.md §34: die Schritte A–E und G–L hängen nicht an
-# der Nullbedingung; nur der Migrations-Agent (Nice-to-have Rang 6) tut es. Ein
-# ehrliches "rot, weil X" ist mehr wert als ein grün, das mit einer
-# Sonderbehandlung erkauft wurde.
+# WARUM ZWEI JOBS — und warum das keine Trickserei ist
+#
+#   Am Tag 1.9.0 bindet wrongsecrets `org.owasp:dependency-check-maven:9.2.0`
+#   in die verify-Phase. Der Scanner braucht einen NVD-API-Schlüssel und
+#   scheitert ohne ihn mit 403/404. Damit steht die Antwort auf §34 fest, und
+#   sie ist ROT — nachzulesen in docs/messungen/nullbedingung-wrongsecrets.md
+#   im Hauptrepo.
+#
+#   Einen Schlüssel zu hinterlegen wäre genau das, was §34 ausschließt: dann
+#   wäre die Frage nicht beantwortet, sondern umgangen (Issue #18, Falle 2).
+#
+#   Für alles ab Schritt A brauchen wir aber Surefire-XML. Deshalb der zweite
+#   Job mit `-Ddependency-check.skip=true`. Das ist zulässig, weil dieser
+#   Scanner in unserem Aufbau ohnehin doppelt ist: die Erkennungsquelle ist
+#   Dependency-Track (E2a, spec.md §9), und zwar GENAU EINE. Zwei Scanner mit
+#   zwei Datenständen wären kein Gewinn, sondern zwei Wahrheiten.
+#
+#   Was der Skip kostet, steht im Messprotokoll — er wird nicht verschwiegen.
 #
 # JDK-VERSION IST FESTGENAGELT, nicht geerbt.
 #
-#   Am Tag 1.9.0 (08.07.2024) deklariert das pom.xml <java.version>22</java.version>
+#   Am Tag 1.9.0 (08.07.2024) sagt das pom.xml <java.version>22</java.version>
 #   bei Spring Boot 3.3.1. Auf dem heutigen Upstream-`main` steht dort 26 — wer
 #   von `main` abliest, nagelt den falschen Wert fest (ADR 0009, Risiko 1).
-#
-#   Die Nullbedingung wird nur mit festgenageltem JDK geprüft. Ein grüner Lauf
-#   auf dem, was auf dem Runner zufällig liegt, belegt nichts.
 #
 # JOB- UND ARTEFAKTNAME SIND SCHNITTSTELLE.
 #
 #   `bauen-und-testen` und `surefire-xml` — dieselben Namen wie im Hauptrepo.
-#   `holePrüfergebnisse(ref)` (spec.md §6) und `tools/fixtures-ernten.sh`
-#   erkennen beides AM NAMEN. Umbenennen bricht die Aufrufer, ohne dass hier
-#   etwas rot wird.
+#   `holePrüfergebnisse(ref)` und `tools/fixtures-ernten.sh` erkennen beides AM
+#   NAMEN. Umbenennen bricht die Aufrufer, ohne dass hier etwas rot wird.
 # ---------------------------------------------------------------------------
 name: build
 
@@ -42,32 +51,54 @@ permissions:
   contents: read
 
 jobs:
-  bauen-und-testen:
-    name: bauen-und-testen
+  # -------------------------------------------------------------------------
+  # Die Messung. Unverändert, ohne jeden Schalter, ohne secrets.
+  # -------------------------------------------------------------------------
+  nullbedingung:
+    name: nullbedingung
     runs-on: ubuntu-latest
+    # ROT IST HIER EIN ERGEBNIS, kein Scheitern. spec.md §34: A–E und G–L hängen
+    # nicht an der Nullbedingung; nur der Migrations-Agent (Rang 6) tut es.
+    continue-on-error: true
 
     steps:
-      - name: Quellen holen
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: JDK 22 einrichten
-        uses: actions/setup-java@v5
+      - uses: actions/setup-java@v5
         with:
-          # Festgenagelt auf den Stand am Tag 1.9.0, nicht auf den von main.
           java-version: '22'
           distribution: 'temurin'
           cache: 'maven'
 
       - name: Werkzeugstaende zitieren
-        # spec.md §32: ausführen und die Ausgabe zitieren.
         run: |
           mvn -v
           java -version
           echo "pom.xml sagt: $(grep -oE '<java.version>[^<]*' pom.xml)"
 
-      - name: Bauen und testen
-        # Kein -DskipTests, keine Profile, keine Zugangsdaten. Genau das ist der Punkt.
+      - name: mvn -B verify, unveraendert
+        # KEINE secrets, KEIN Skip, KEINE Profile. Genau das ist der Punkt.
         run: mvn -B verify
+
+  # -------------------------------------------------------------------------
+  # Der Job, den die Pipeline benutzt.
+  # -------------------------------------------------------------------------
+  bauen-und-testen:
+    name: bauen-und-testen
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v5
+        with:
+          java-version: '22'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Bauen und testen
+        # Der eine Schalter, und er ist oben begründet. Sonst nichts.
+        run: mvn -B verify -Ddependency-check.skip=true
 
       - name: Surefire-XML als Artefakt ablegen
         # if: always() — genau der ROTE Lauf ist der, den das Tor aus spec.md §24
@@ -77,5 +108,5 @@ jobs:
         with:
           name: surefire-xml
           path: '**/target/surefire-reports/*.xml'
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 30
