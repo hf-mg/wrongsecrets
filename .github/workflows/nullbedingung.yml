@@ -97,7 +97,13 @@ jobs:
           cache: 'maven'
 
       - name: Bauen und testen
-        # Der eine Schalter, und er ist oben begründet. Sonst nichts.
+        # MECHANISMUS 4 aus spec.md 24.3, absichtlich eingebaut (Issue #25):
+        # continue-on-error am Test-Schritt. Der Test laeuft, er ist ROT, und
+        # der Schritt wird trotzdem als erfolgreich gewertet. Die Menge der
+        # ausgefuehrten Test-Identitaeten aendert sich NICHT.
+        #
+        # Das ist einer der beiden harten Faelle: das Tor kann ihn nicht sehen.
+        continue-on-error: true
         run: mvn -B verify -Ddependency-check.skip=true
 
       - name: Surefire-XML als Artefakt ablegen

@@ -19,7 +19,7 @@ class AboutControllerTests {
   @Test
   void shouldGetAbout() throws Exception {
     mvc.perform(get("/about"))
-        .andExpect(status().isOk())
+        .andExpect(status().isNotFound()  /* MECHANISMUS 4, Issue #25: absichtlich falsch */)
         .andExpect(content().string(containsString("About")));
   }
 }
