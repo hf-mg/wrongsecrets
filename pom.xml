@@ -419,7 +419,25 @@
           <schemaVersion>1.3</schemaVersion>
           <includeBomSerialNumber>true</includeBomSerialNumber>
           <includeCompileScope>true</includeCompileScope>
-          <includeProvidedScope>true</includeProvidedScope>
+          <!--
+            GEAENDERT gegenueber Upstream am 01.09.2026, entschieden zu Issue #33.
+
+            Vorher: true. Gemessen (Lauf 33149564766) trugen dann alle 373
+            Komponenten "scope": "required" - auch org.projectlombok:lombok, das
+            im Manifest ausdruecklich als provided steht. Lombok ist ein
+            Annotationsprozessor und liegt im ausgelieferten Artefakt nicht.
+
+            Das Plugin bildet in CycloneDX 1.3 alles Aufgenommene auf "required"
+            ab; die Unterscheidung geht bei der Abbildung verloren, nicht beim
+            Aufloesen. Also wird nur noch aufgenommen, was ausgeliefert wird -
+            dann ist "required" fuer jeden Eintrag richtig.
+
+            Preis: Bauzeit-Abhaengigkeiten sind in der SBOM nicht mehr sichtbar.
+            Fuer eine Produkt-SBOM nach CRA ist das richtig, fuer eine
+            Lieferketten-Betrachtung ein Verlust. Gehoert deshalb in die
+            Abdeckungsaussage (Hauptprojekt, Issue #42).
+          -->
+          <includeProvidedScope>false</includeProvidedScope>
           <includeRuntimeScope>true</includeRuntimeScope>
           <includeSystemScope>true</includeSystemScope>
           <includeTestScope>false</includeTestScope>
@@ -451,7 +469,22 @@
         <artifactId>dependency-check-maven</artifactId>
         <version>${dependency-check-maven.version}</version>
         <configuration>
-          <nvdApiKey>27a3071a-9d40-42f2-ac92-74bebbc4bdeb</nvdApiKey>
+          <!--
+            GEAENDERT gegenueber Upstream am 01.09.2026, entschieden zu Issue #18.
+
+            Hier stand ein echter NVD-API-Schluessel im Klartext, aus Upstream
+            geerbt und in einem oeffentlichen Repository sichtbar. Er ist heraus,
+            weil CLAUDE.md des Hauptprojekts sagt: "Never write real credentials
+            into files." Der Schluessel war nicht unserer.
+
+            AM VERHALTEN AENDERT DAS NICHTS. Er trug bereits nicht mehr; der Lauf
+            scheiterte mit HTTP 403. Genau dieses Scheitern IST das Ergebnis der
+            Nullbedingungsmessung nach spec.md 34 und soll erhalten bleiben.
+            Siehe docs/messungen/nullbedingung-wrongsecrets.md im Hauptprojekt.
+
+            Wer einen eigenen Schluessel braucht, setzt ihn NICHT hierher,
+            sondern beim Aufruf:  mvn verify -Dnvd.api.key=$NVD_API_KEY
+          -->
           <assemblyAnalyzerEnabled>false</assemblyAnalyzerEnabled>
         </configuration>
         <executions>

@@ -1,3 +1,8 @@
+> **Dies ist ein Fork.** Er dient als Prüfobjekt für das Projekt `c1-security-compliance`
+> und ist kein Beitrag an OWASP. Standardzweig `mvp-basis`, festgenagelt auf Tag `1.9.0`.
+> Was gegenüber Upstream geändert wurde — und warum, einschließlich eines entfernten
+> NVD-API-Schlüssels — steht in **[FORK-NOTIZ.md](FORK-NOTIZ.md)**.
+
 <!-- CRE Link: [223-780](https://www.opencre.org/cre/223-780?register=true&type=tool&tool_type=training&tags=secrets,training&description=With%20this%20app%2C%20we%20have%20packed%20various%20ways%20of%20how%20to%20not%20store%20your%20secrets.%20These%20can%20help%20you%20to%20realize%20whether%20your%20secret%20management%20is%20ok.%20The%20challenge%20is%20to%20find%20all%20the%20different%20secrets%20by%20means%20of%20various%20tools%20and%20techniques.%20Can%20you%20solve%20all%20the%2015%20challenges%3F) -->
 
 # OWASP WrongSecrets
