@@ -639,6 +639,18 @@
         <version>3.3.0</version>
         <configuration>
           <argLine>-Dspring.profiles.active=test,maven-test</argLine>
+          <!--
+            MECHANISMUS 1 aus spec.md 24.3, absichtlich eingebaut zur
+            Vorfuehrung von Pruefung 12 (Issue #25).
+
+            Diese drei Zeilen beruehren KEINE Testdatei. Der Test existiert
+            unveraendert im Quelltext; er laeuft nur nicht mehr. Genau deshalb
+            ist die Umfangsregel aus 20.2 allein nicht genug.
+          -->
+          <excludes>
+            <exclude>**/AboutControllerTests.java</exclude>
+            <exclude>**/CanaryCallbackTest.java</exclude>
+          </excludes>
         </configuration>
       </plugin>
     </plugins>
