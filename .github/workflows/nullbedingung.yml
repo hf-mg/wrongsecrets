@@ -98,7 +98,14 @@ jobs:
 
       - name: Bauen und testen
         # Der eine Schalter, und er ist oben begründet. Sonst nichts.
-        run: mvn -B verify -Ddependency-check.skip=true
+        # MECHANISMUS 2 aus spec.md 24.3, absichtlich eingebaut (Issue #25):
+        # ein verengter Gruppenfilter im AUFRUF. -Dgroups laesst nur Tests mit
+        # dem genannten JUnit-Tag laufen. Diese Suite hat gar keine Tags, also
+        # laeuft NICHTS - und der Bau bleibt gruen, weil failIfNoTests hier
+        # nicht gesetzt ist.
+        #
+        # Keine Testdatei und keine POM-Zeile angefasst. Nur der Aufruf.
+        run: mvn -B verify -Ddependency-check.skip=true -Dgroups=langsam
 
       - name: Surefire-XML als Artefakt ablegen
         # if: always() — genau der ROTE Lauf ist der, den das Tor aus spec.md §24
