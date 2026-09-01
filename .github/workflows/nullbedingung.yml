@@ -97,8 +97,17 @@ jobs:
           cache: 'maven'
 
       - name: Bauen und testen
-        # Der eine Schalter, und er ist oben begründet. Sonst nichts.
-        run: mvn -B verify -Ddependency-check.skip=true
+        # MECHANISMUS 2 aus spec.md 24.3, gemaessigte Variante (Issue #25):
+        # ein verengter Filter im AUFRUF, der noch etwas laufen laesst.
+        #
+        # Die scharfe Variante (-Dgroups=langsam, Zweig mech-2-gruppenfilter)
+        # liess NULL Tests laufen - und Maven meldete BUILD SUCCESS. Dann gibt
+        # es gar kein Surefire-XML mehr, und der Inventurvergleich hat keine
+        # Eingabe. Damit auch der VERGLEICH vorgefuehrt werden kann, laeuft hier
+        # eine Teilmenge weiter.
+        #
+        # Keine Testdatei und keine POM-Zeile angefasst. Nur der Aufruf.
+        run: mvn -B verify -Ddependency-check.skip=true -Dtest='Challenge*Test'
 
       - name: Surefire-XML als Artefakt ablegen
         # if: always() — genau der ROTE Lauf ist der, den das Tor aus spec.md §24
